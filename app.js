@@ -51,7 +51,7 @@ const QUIZ_QUESTIONS = [
 ];
 
 // Game entities
-const Character = (props: any) => {
+const Character = props => {
   const { body } = props;
   const { position } = body;
 
@@ -68,7 +68,7 @@ const Character = (props: any) => {
   );
 };
 
-const Enemy = (props: any) => {
+const Enemy = props => {
   const { body } = props;
   const { position } = body;
 
@@ -88,66 +88,49 @@ const Enemy = (props: any) => {
 };
 
 // Physics engine setup
-const Physics = (entities: any, { time, input }: any) => {
+const Physics = (entities, { time, input }) => {
   const engine = entities.physics.engine;
-  const world = engine.world;
+  const world = entities.physics.world;
 
   // Update physics
   Matter.Engine.update(engine, time.delta);
 
-  // Move character forward
+  // Move character forward automatically (no user control)
   const character = entities.character.body;
-  Matter.Body.setVelocity(character, {
-    x: GAME_SPEED,
-    y: character.velocity.y,
-  });
+  Matter.Body.setVelocity(character, { x: GAME_SPEED, y: 0 });
 
-  // Handle user input for up/down
-  if (entities.moveDirection) {
-    if (entities.moveDirection === 'up') {
-      Matter.Body.setVelocity(character, { x: GAME_SPEED, y: -7 });
-    } else if (entities.moveDirection === 'down') {
-      Matter.Body.setVelocity(character, { x: GAME_SPEED, y: 7 });
-    }
-    entities.moveDirection = null;
-  }
-
-  // Spawn enemies randomly
-  if (Math.random() < ENEMY_SPAWN_RATE) {
+  // For demo: spawn a single enemy directly in front of the character if not already present
+  if (!entities.enemy) {
+    const characterY = character.position.y;
     const enemy = Matter.Bodies.rectangle(
-      screenWidth + ENEMY_SIZE,
-      Math.random() * (screenHeight - 200) + 100,
+      character.position.x + 200, // 200px in front of character
+      characterY,
       ENEMY_SIZE,
       ENEMY_SIZE,
       { isStatic: false },
     );
     Matter.World.add(world, enemy);
-    entities[`enemy-${Date.now()}`] = {
+    entities.enemy = {
       body: enemy,
       renderer: Enemy,
     };
   }
 
-  // Remove enemies that are off screen
-  Object.keys(entities).forEach(key => {
-    if (key.startsWith('enemy-')) {
-      const enemy = entities[key];
-      if (enemy.body.position.x < -ENEMY_SIZE) {
-        Matter.World.remove(world, enemy.body);
-        delete entities[key];
-      }
-    }
-  });
+  // Remove enemy if off screen (optional, for cleanup)
+  if (entities.enemy && entities.enemy.body.position.x < -ENEMY_SIZE) {
+    Matter.World.remove(world, entities.enemy.body);
+    delete entities.enemy;
+  }
 
   return entities;
 };
 
 // Collision detection
-const CollisionDetection = (entities: any, { events, dispatch }: any) => {
+const CollisionDetection = (entities, { events, dispatch }) => {
   const character = entities.character.body;
 
   Object.keys(entities).forEach(key => {
-    if (key.startsWith('enemy-')) {
+    if (key.startsWith('enemy-') || key === 'enemy') {
       const enemy = entities[key];
       const distance = Math.sqrt(
         Math.pow(character.position.x - enemy.body.position.x, 2) +
@@ -169,29 +152,33 @@ export default function App() {
   const [showQuiz, setShowQuiz] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [score, setScore] = useState(0);
-  const gameEngineRef = useRef<any>(null);
+  const gameEngineRef = useRef(null);
 
-  // Initialize physics world
-  const engine = Matter.Engine.create({ enableSleeping: false });
-  const world = engine.world;
+  // Persist engine, world, character, and entities across renders
+  const engineRef = useRef();
+  const worldRef = useRef();
+  const characterRef = useRef();
+  const entitiesRef = useRef();
 
-  // Create character
-  const character = Matter.Bodies.rectangle(
-    50,
-    screenHeight / 2,
-    CHARACTER_SIZE,
-    CHARACTER_SIZE,
-    { isStatic: false },
-  );
-
-  Matter.World.add(world, character);
-
-  // Initial entities
-  const entities: any = {
-    physics: { engine, world },
-    character: { body: character, renderer: Character },
-    moveDirection: null,
-  };
+  // Initialize only once
+  if (!engineRef.current) {
+    engineRef.current = Matter.Engine.create({ enableSleeping: false });
+    worldRef.current = engineRef.current.world;
+    // Disable vertical gravity
+    worldRef.current.gravity.y = 0;
+    characterRef.current = Matter.Bodies.rectangle(
+      50,
+      screenHeight / 2,
+      CHARACTER_SIZE,
+      CHARACTER_SIZE,
+      { isStatic: false },
+    );
+    Matter.World.add(worldRef.current, characterRef.current);
+    entitiesRef.current = {
+      physics: { engine: engineRef.current, world: worldRef.current },
+      character: { body: characterRef.current, renderer: Character },
+    };
+  }
 
   // Start game
   const startGame = () => {
@@ -202,44 +189,50 @@ export default function App() {
     setCurrentQuestion(0);
 
     // Reset character position
-    Matter.Body.setPosition(character, { x: 50, y: screenHeight / 2 });
-    Matter.Body.setVelocity(character, { x: 0, y: 0 });
+    Matter.Body.setPosition(characterRef.current, {
+      x: 50,
+      y: screenHeight / 2,
+    });
+    Matter.Body.setVelocity(characterRef.current, { x: 0, y: 0 });
+
+    // Remove the demo enemy if present
+    if (entitiesRef.current.enemy) {
+      Matter.World.remove(worldRef.current, entitiesRef.current.enemy.body);
+      delete entitiesRef.current.enemy;
+    }
   };
 
   // Handle collision
-  const handleCollision = (event: any) => {
+  const handleCollision = event => {
     if (event.type === 'collision') {
       setGameRunning(false);
       setShowQuiz(true);
-
-      // Remove the collided enemy
-      const enemyKey = event.enemyKey;
-      if (gameEngineRef.current) {
-        const entities = gameEngineRef.current.state.entities;
-        if (entities[enemyKey]) {
-          Matter.World.remove(world, entities[enemyKey].body);
-          delete entities[enemyKey];
-        }
-      }
+      // Do NOT remove the enemy yet; wait for quiz answer
     }
   };
 
   // Handle quiz answer
-  const handleQuizAnswer = (selectedOption: number) => {
+  const handleQuizAnswer = selectedOption => {
     const question = QUIZ_QUESTIONS[currentQuestion];
 
     if (selectedOption === question.correct) {
-      // Correct answer
       setScore(score + 10);
       setShowQuiz(false);
       setGameRunning(true);
-
-      // Move to next question
       setCurrentQuestion((currentQuestion + 1) % QUIZ_QUESTIONS.length);
+      // Remove the enemy so the ball can keep moving
+      if (entitiesRef.current.enemy) {
+        Matter.World.remove(worldRef.current, entitiesRef.current.enemy.body);
+        delete entitiesRef.current.enemy;
+      }
     } else {
-      // Wrong answer - Game Over
       setShowQuiz(false);
       setGameOver(true);
+      // Remove the enemy for a clean restart
+      if (entitiesRef.current.enemy) {
+        Matter.World.remove(worldRef.current, entitiesRef.current.enemy.body);
+        delete entitiesRef.current.enemy;
+      }
     }
   };
 
@@ -251,13 +244,11 @@ export default function App() {
     setScore(0);
     setCurrentQuestion(0);
 
-    // Clear all enemies
-    Object.keys(entities).forEach(key => {
-      if (key.startsWith('enemy-')) {
-        Matter.World.remove(world, entities[key].body);
-        delete entities[key];
-      }
-    });
+    // Remove the demo enemy if present
+    if (entitiesRef.current.enemy) {
+      Matter.World.remove(worldRef.current, entitiesRef.current.enemy.body);
+      delete entitiesRef.current.enemy;
+    }
   };
 
   return (
@@ -276,38 +267,13 @@ export default function App() {
 
       {/* Game Engine */}
       {gameRunning && (
-        <>
-          <GameEngine
-            ref={gameEngineRef}
-            systems={[Physics, CollisionDetection]}
-            entities={Object.fromEntries(
-              Object.entries(entities).filter(
-                ([, value]) => value && (value as any).renderer,
-              ),
-            )}
-            onEvent={handleCollision}
-            style={styles.gameContainer}
-          />
-          {/* Controls */}
-          <View style={styles.controlsContainer} pointerEvents="box-none">
-            <TouchableOpacity
-              style={styles.controlButton}
-              onPress={() => {
-                entities.moveDirection = 'up';
-              }}
-            >
-              <Text style={styles.controlButtonText}>▲</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.controlButton}
-              onPress={() => {
-                entities.moveDirection = 'down';
-              }}
-            >
-              <Text style={styles.controlButtonText}>▼</Text>
-            </TouchableOpacity>
-          </View>
-        </>
+        <GameEngine
+          ref={gameEngineRef}
+          systems={[Physics, CollisionDetection]}
+          entities={entitiesRef.current}
+          onEvent={handleCollision}
+          style={styles.gameContainer}
+        />
       )}
 
       {/* Quiz Modal */}

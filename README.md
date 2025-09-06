@@ -1,97 +1,58 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# EduMario - Educational Mario Game
 
-# Getting Started
+A simple React Native game that combines platforming with educational quizzes. The character automatically moves forward, and when it collides with enemies, players must answer quiz questions to continue playing.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+## Features
 
-## Step 1: Start Metro
+- 🎮 Side-scrolling Mario-style character that auto-moves forward
+- 👾 Randomly spawning enemies (red circles)
+- 🧠 Educational quiz popups when colliding with enemies
+- 📊 Score system
+- 🎯 Multiple choice questions covering various topics
+- 💀 Game over screen for wrong answers
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+## Installation
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+Make sure you have Node.js and React Native development environment set up. Then run:
 
-```sh
-# Using npm
-npm start
+```bash
+# Install dependencies
+npm install
 
-# OR using Yarn
-yarn start
-```
-
-## Step 2: Build and run your app
-
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
-
-### Android
-
-```sh
-# Using npm
+# For Android development, make sure you have Android Studio and an emulator running
+# Then run:
 npm run android
-
-# OR using Yarn
-yarn android
 ```
 
-### iOS
+## How to Play
 
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
+1. Tap "Start Game" to begin
+2. Watch as your character automatically moves forward
+3. When you collide with a red enemy, a quiz question will appear
+4. Answer correctly to continue playing and earn points
+5. Answer incorrectly to trigger Game Over
+6. Try to get the highest score possible!
 
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
+## Game Mechanics
 
-```sh
-bundle install
-```
+- **Character**: Red circle that moves automatically from left to right
+- **Enemies**: Red circles that spawn randomly on the right side of the screen
+- **Collision**: When character touches an enemy, the game pauses and shows a quiz
+- **Scoring**: +10 points for each correct answer
+- **Quiz**: 5 different questions covering math, colors, geography, and general knowledge
 
-Then, and every time you update your native dependencies, run:
+## Technical Details
 
-```sh
-bundle exec pod install
-```
+- Built with React Native and TypeScript
+- Uses `react-native-game-engine` for game loop management
+- Uses `matter-js` for physics simulation
+- Simple collision detection system
+- Modal-based UI for quizzes and game over screens
 
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
+## Dependencies
 
-```sh
-# Using npm
-npm run ios
+- react-native-game-engine
+- matter-js
+- @types/matter-js (for TypeScript support)
 
-# OR using Yarn
-yarn ios
-```
-
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
-
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
-
-## Step 3: Modify your app
-
-Now that you have successfully run the app, let's make changes!
-
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
-
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
-
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
-
-## Congratulations! :tada:
-
-You've successfully run and modified your React Native App. :partying_face:
-
-### Now what?
-
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
-
-# Troubleshooting
-
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
-
-# Learn More
-
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+Enjoy learning while playing! 🎓🎮
