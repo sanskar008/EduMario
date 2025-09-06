@@ -24,29 +24,55 @@ const ENEMY_SIZE = 30;
 // Quiz questions
 const QUIZ_QUESTIONS = [
   {
-    question: 'What is 2 + 2?',
-    options: ['3', '4', '5', '6'],
+    question: '🧮 What is 7 × 8?',
+    options: ['54', '56', '48', '64'],
     correct: 1,
   },
   {
-    question: 'What color do you get when you mix red and blue?',
+    question: '🎨 What color do you get when you mix red and blue?',
     options: ['Green', 'Purple', 'Orange', 'Yellow'],
     correct: 1,
   },
   {
-    question: 'How many days are in a week?',
+    question: '📅 How many days are in a week?',
     options: ['5', '6', '7', '8'],
     correct: 2,
   },
   {
-    question: 'What is the capital of France?',
+    question: '🌍 What is the capital of France?',
     options: ['London', 'Berlin', 'Paris', 'Madrid'],
     correct: 2,
   },
   {
-    question: "What animal says 'meow'?",
+    question: '🐱 What animal says "meow"?',
     options: ['Dog', 'Cat', 'Bird', 'Fish'],
     correct: 1,
+  },
+  {
+    question: '🌟 Which planet is closest to the Sun?',
+    options: ['Venus', 'Mercury', 'Earth', 'Mars'],
+    correct: 1,
+  },
+  {
+    question: '📚 How many letters are in the English alphabet?',
+    options: ['24', '25', '26', '27'],
+    correct: 2,
+  },
+  {
+    question:
+      '🍎 What fruit is traditionally associated with keeping doctors away?',
+    options: ['Orange', 'Banana', 'Apple', 'Grape'],
+    correct: 2,
+  },
+  {
+    question: '⚡ What is 15 + 27?',
+    options: ['41', '42', '43', '44'],
+    correct: 1,
+  },
+  {
+    question: '🌊 What is the largest ocean on Earth?',
+    options: ['Atlantic', 'Indian', 'Arctic', 'Pacific'],
+    correct: 3,
   },
 ];
 
@@ -64,7 +90,9 @@ const Character = props => {
           top: position.y - CHARACTER_SIZE / 2,
         },
       ]}
-    />
+    >
+      <Text style={styles.characterEmoji}>🦸‍♂️</Text>
+    </View>
   );
 };
 
@@ -82,7 +110,7 @@ const Enemy = props => {
         },
       ]}
     >
-      <Text style={styles.enemyIcon}>💀</Text>
+      <Text style={styles.enemyIcon}>🧌</Text>
     </View>
   );
 };
@@ -95,12 +123,44 @@ const Physics = (entities, { time, input }) => {
   // Update physics
   Matter.Engine.update(engine, time.delta);
 
-  // Move character forward automatically (no user control)
+  // Move character forward automatically
   const character = entities.character.body;
   Matter.Body.setVelocity(character, { x: GAME_SPEED, y: 0 });
 
+  // Spawn enemies randomly
+  if (Math.random() < ENEMY_SPAWN_RATE) {
+    const enemyId = `enemy-${Date.now()}`;
+    const randomY = Math.random() * (screenHeight - 200) + 100; // Random Y position
+    const enemy = Matter.Bodies.rectangle(
+      character.position.x + 300, // Spawn ahead of character
+      randomY,
+      ENEMY_SIZE,
+      ENEMY_SIZE,
+      { isStatic: false },
+    );
+    Matter.World.add(world, enemy);
+    entities[enemyId] = {
+      body: enemy,
+      renderer: Enemy,
+    };
+  }
+
+  // Remove enemies that are off-screen
+  Object.keys(entities).forEach(key => {
+    if (
+      key.startsWith('enemy-') &&
+      entities[key].body.position.x < character.position.x - 100
+    ) {
+      Matter.World.remove(world, entities[key].body);
+      delete entities[key];
+    }
+  });
+
   // For demo: spawn a single enemy directly in front of the character if not already present
-  if (!entities.enemy) {
+  if (
+    !entities.enemy &&
+    Object.keys(entities).filter(key => key.startsWith('enemy-')).length === 0
+  ) {
     const characterY = character.position.y;
     const enemy = Matter.Bodies.rectangle(
       character.position.x + 200, // 200px in front of character
@@ -116,8 +176,11 @@ const Physics = (entities, { time, input }) => {
     };
   }
 
-  // Remove enemy if off screen (optional, for cleanup)
-  if (entities.enemy && entities.enemy.body.position.x < -ENEMY_SIZE) {
+  // Remove demo enemy if off screen
+  if (
+    entities.enemy &&
+    entities.enemy.body.position.x < character.position.x - 100
+  ) {
     Matter.World.remove(world, entities.enemy.body);
     delete entities.enemy;
   }
@@ -152,6 +215,7 @@ export default function App() {
   const [showQuiz, setShowQuiz] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [score, setScore] = useState(0);
+  const [currentCollidedEnemy, setCurrentCollidedEnemy] = useState(null);
   const gameEngineRef = useRef(null);
 
   // Persist engine, world, character, and entities across renders
@@ -187,6 +251,7 @@ export default function App() {
     setShowQuiz(false);
     setScore(0);
     setCurrentQuestion(0);
+    setCurrentCollidedEnemy(null);
 
     // Reset character position
     Matter.Body.setPosition(characterRef.current, {
@@ -195,11 +260,13 @@ export default function App() {
     });
     Matter.Body.setVelocity(characterRef.current, { x: 0, y: 0 });
 
-    // Remove the demo enemy if present
-    if (entitiesRef.current.enemy) {
-      Matter.World.remove(worldRef.current, entitiesRef.current.enemy.body);
-      delete entitiesRef.current.enemy;
-    }
+    // Remove all enemies for a fresh start
+    Object.keys(entitiesRef.current).forEach(key => {
+      if (key.startsWith('enemy-') || key === 'enemy') {
+        Matter.World.remove(worldRef.current, entitiesRef.current[key].body);
+        delete entitiesRef.current[key];
+      }
+    });
   };
 
   // Handle collision
@@ -207,7 +274,8 @@ export default function App() {
     if (event.type === 'collision') {
       setGameRunning(false);
       setShowQuiz(true);
-      // Do NOT remove the enemy yet; wait for quiz answer
+      // Store the collided enemy key for later removal
+      setCurrentCollidedEnemy(event.enemyKey);
     }
   };
 
@@ -220,19 +288,26 @@ export default function App() {
       setShowQuiz(false);
       setGameRunning(true);
       setCurrentQuestion((currentQuestion + 1) % QUIZ_QUESTIONS.length);
-      // Remove the enemy so the ball can keep moving
-      if (entitiesRef.current.enemy) {
-        Matter.World.remove(worldRef.current, entitiesRef.current.enemy.body);
-        delete entitiesRef.current.enemy;
+      // Remove the collided enemy so the character can keep moving
+      if (currentCollidedEnemy && entitiesRef.current[currentCollidedEnemy]) {
+        Matter.World.remove(
+          worldRef.current,
+          entitiesRef.current[currentCollidedEnemy].body,
+        );
+        delete entitiesRef.current[currentCollidedEnemy];
       }
+      setCurrentCollidedEnemy(null);
     } else {
       setShowQuiz(false);
       setGameOver(true);
-      // Remove the enemy for a clean restart
-      if (entitiesRef.current.enemy) {
-        Matter.World.remove(worldRef.current, entitiesRef.current.enemy.body);
-        delete entitiesRef.current.enemy;
-      }
+      // Remove all enemies for a clean restart
+      Object.keys(entitiesRef.current).forEach(key => {
+        if (key.startsWith('enemy-') || key === 'enemy') {
+          Matter.World.remove(worldRef.current, entitiesRef.current[key].body);
+          delete entitiesRef.current[key];
+        }
+      });
+      setCurrentCollidedEnemy(null);
     }
   };
 
@@ -243,24 +318,37 @@ export default function App() {
     setShowQuiz(false);
     setScore(0);
     setCurrentQuestion(0);
+    setCurrentCollidedEnemy(null);
 
-    // Remove the demo enemy if present
-    if (entitiesRef.current.enemy) {
-      Matter.World.remove(worldRef.current, entitiesRef.current.enemy.body);
-      delete entitiesRef.current.enemy;
-    }
+    // Remove all enemies for a clean restart
+    Object.keys(entitiesRef.current).forEach(key => {
+      if (key.startsWith('enemy-') || key === 'enemy') {
+        Matter.World.remove(worldRef.current, entitiesRef.current[key].body);
+        delete entitiesRef.current[key];
+      }
+    });
   };
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#2c3e50" />
+      <StatusBar barStyle="light-content" backgroundColor="#1a237e" />
+
+      {/* Background with parallax effect */}
+      <View style={styles.gameBackground}>
+        <View style={styles.cloud} />
+        <View style={[styles.cloud, styles.cloud2]} />
+        <View style={[styles.cloud, styles.cloud3]} />
+      </View>
 
       {/* Game UI */}
       <View style={styles.gameUI}>
-        <Text style={styles.scoreText}>Score: {score}</Text>
+        <View style={styles.scoreContainer}>
+          <Text style={styles.scoreLabel}>SCORE</Text>
+          <Text style={styles.scoreText}>{score}</Text>
+        </View>
         {!gameRunning && !gameOver && (
           <TouchableOpacity style={styles.startButton} onPress={startGame}>
-            <Text style={styles.buttonText}>Start Game</Text>
+            <Text style={styles.buttonText}>🎮START ADVENTURE</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -276,11 +364,16 @@ export default function App() {
         />
       )}
 
+      {/* Ground decoration */}
+      <View style={styles.ground}>
+        <Text style={styles.groundPattern}>🌱🌿🌱🌿🌱🌿🌱🌿🌱🌿🌱🌿🌱🌿🌱</Text>
+      </View>
+
       {/* Quiz Modal */}
       <Modal
         visible={showQuiz}
         transparent={true}
-        animationType="fade"
+        animationType="slide"
         onRequestClose={() => setShowQuiz(false)}
       >
         <View style={styles.modalOverlay}>
@@ -312,10 +405,10 @@ export default function App() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.gameOverContainer}>
-            <Text style={styles.gameOverTitle}>Game Over!</Text>
-            <Text style={styles.finalScoreText}>Final Score: {score}</Text>
+            <Text style={styles.gameOverTitle}>💥 Game Over!</Text>
+            <Text style={styles.finalScoreText}>🏆 Final Score: {score}</Text>
             <TouchableOpacity style={styles.restartButton} onPress={resetGame}>
-              <Text style={styles.buttonText}>Play Again</Text>
+              <Text style={styles.buttonText}>🔄 Try Again</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -327,7 +420,60 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#2c3e50',
+    backgroundColor: '#87CEEB',
+  },
+  gameBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'linear-gradient(to bottom, #87CEEB, #98D8E8)',
+  },
+  cloud: {
+    position: 'absolute',
+    width: 80,
+    height: 40,
+    backgroundColor: 'white',
+    borderRadius: 20,
+    top: 100,
+    left: 50,
+    opacity: 0.8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  cloud2: {
+    width: 100,
+    height: 50,
+    top: 150,
+    left: 200,
+    animationDelay: '2s',
+  },
+  cloud3: {
+    width: 120,
+    height: 60,
+    top: 80,
+    left: 300,
+    animationDelay: '4s',
+  },
+  ground: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 60,
+    backgroundColor: '#8B4513',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderTopWidth: 3,
+    borderTopColor: '#654321',
+  },
+  groundPattern: {
+    fontSize: 16,
+    color: '#228B22',
+    textAlign: 'center',
   },
   gameUI: {
     position: 'absolute',
@@ -339,118 +485,135 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  scoreContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 20,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  scoreLabel: {
+    color: '#1a237e',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
   scoreText: {
-    color: 'white',
-    fontSize: 18,
+    color: '#1a237e',
+    fontSize: 24,
     fontWeight: 'bold',
   },
   startButton: {
-    backgroundColor: '#e74c3c',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 5,
+    backgroundColor: '#FF6B35',
+    paddingHorizontal: 25,
+    paddingVertical: 12,
+    borderRadius: 25,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 8,
+    borderWidth: 2,
+    borderColor: '#FF4500',
   },
   buttonText: {
     color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
+    textAlign: 'center',
   },
   gameContainer: {
     flex: 1,
-    backgroundColor: '#87CEEB', // Sky blue background
+    backgroundColor: 'transparent',
   },
   character: {
     position: 'absolute',
     width: CHARACTER_SIZE,
     height: CHARACTER_SIZE,
-    backgroundColor: '#e74c3c',
+    backgroundColor: '#FF6B35',
     borderRadius: CHARACTER_SIZE / 2,
-    borderWidth: 2,
-    borderColor: '#c0392b',
+    borderWidth: 3,
+    borderColor: '#FF4500',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  characterEmoji: {
+    fontSize: 28,
+    textAlign: 'center',
   },
   enemy: {
     position: 'absolute',
     width: ENEMY_SIZE,
     height: ENEMY_SIZE,
-    backgroundColor: '#fff',
+    backgroundColor: '#8B0000',
     borderRadius: ENEMY_SIZE / 2,
     borderWidth: 3,
-    borderColor: '#222',
+    borderColor: '#654321',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.5,
-    shadowRadius: 4,
-    elevation: 5,
+    shadowRadius: 5,
+    elevation: 6,
   },
   enemyIcon: {
-    fontSize: 22,
-    color: '#e74c3c',
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  controlsContainer: {
-    position: 'absolute',
-    right: 20,
-    bottom: 60,
-    flexDirection: 'column',
-    zIndex: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  controlButton: {
-    backgroundColor: '#34495e',
-    padding: 18,
-    borderRadius: 30,
-    marginVertical: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 60,
-    height: 60,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 4,
-  },
-  controlButtonText: {
-    color: '#fff',
-    fontSize: 28,
-    fontWeight: 'bold',
+    fontSize: 20,
     textAlign: 'center',
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   quizContainer: {
     backgroundColor: 'white',
-    padding: 20,
-    borderRadius: 10,
-    width: screenWidth * 0.8,
+    padding: 25,
+    borderRadius: 20,
+    width: screenWidth * 0.85,
     maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 15,
   },
   quizTitle: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: 'bold',
     textAlign: 'center',
     marginBottom: 20,
-    color: '#2c3e50',
+    color: '#1a237e',
   },
   questionText: {
     fontSize: 18,
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: 25,
     color: '#34495e',
+    lineHeight: 24,
   },
   optionButton: {
-    backgroundColor: '#3498db',
-    padding: 15,
-    borderRadius: 5,
-    marginVertical: 5,
+    backgroundColor: '#4CAF50',
+    padding: 18,
+    borderRadius: 15,
+    marginVertical: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 5,
+    borderWidth: 2,
+    borderColor: '#45a049',
   },
   optionText: {
     color: 'white',
@@ -460,27 +623,41 @@ const styles = StyleSheet.create({
   },
   gameOverContainer: {
     backgroundColor: 'white',
-    padding: 30,
-    borderRadius: 10,
-    width: screenWidth * 0.8,
+    padding: 35,
+    borderRadius: 20,
+    width: screenWidth * 0.85,
     maxWidth: 400,
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 15,
   },
   gameOverTitle: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: 'bold',
     color: '#e74c3c',
     marginBottom: 20,
+    textAlign: 'center',
   },
   finalScoreText: {
-    fontSize: 20,
+    fontSize: 22,
     color: '#2c3e50',
-    marginBottom: 20,
+    marginBottom: 25,
+    fontWeight: 'bold',
   },
   restartButton: {
     backgroundColor: '#27ae60',
-    paddingHorizontal: 30,
-    paddingVertical: 15,
-    borderRadius: 5,
+    paddingHorizontal: 35,
+    paddingVertical: 18,
+    borderRadius: 25,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 8,
+    borderWidth: 2,
+    borderColor: '#229954',
   },
 });
